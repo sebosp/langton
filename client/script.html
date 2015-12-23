@@ -1,0 +1,191 @@
+<body>
+    <script type="text/javascript">
+	if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+	var container, stats;
+	var camera, scene, raycaster, renderer,controls,clock;
+	var radius = 100, theta = 0;
+
+	var epoch = (new Date).getTime();
+	var boxSize = 10;
+	var geometry = new THREE.BoxGeometry( boxSize, boxSize, boxSize );
+	var loader = new THREE.TextureLoader();
+	var iter = 0;
+	var maxiter = 2000;
+	var fieldSize = 100;
+	var field = [fieldSize];
+	for (var i = 0; i <= fieldSize; i++){
+		field[i] = new Array(fieldSize);
+		for(var j = 0; j <= fieldSize; j++){
+			field[i][j] = {};
+			field[i][j].weight = 0;
+			field[i][j].color = 0x568203;
+		}
+	}
+	var curx=fieldSize * 0.5;
+	var cury=fieldSize * 0.5;
+	var curz=fieldSize * 0.5;
+	var antDir = 90;
+	init();
+	animate();
+	var grassTexture = loader.load( 'grass.png' );
+	grassTexture.magFilter = THREE.NearestFilter;
+	grassTexture.minFilter = THREE.LinearMipMapLinearFilter;
+	var dirtTexture = loader.load( 'dirt.png' );
+	dirtTexture.magFilter = THREE.NearestFilter;
+	dirtTexture.minFilter = THREE.LinearMipMapLinearFilter;
+	function addBox(){
+		if(iter > maxiter){
+			return;
+		}
+		iter++;
+		field[curx][cury].color = (field[curx][cury].color == 0x568203?0xADFF2F:0x568203);
+		if(field[curx][cury].color == 0xADFF2F){
+			antDir = (antDir + 90) % 360;
+		}else{
+			antDir = (antDir-90<0?270:antDir-90);
+		}
+		if(field[curx][cury].weight > 0){
+			iter--;
+			scene.remove(field[curx][cury].box)
+		}
+		field[curx][cury].weight++;
+		field[curx][cury].box = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({map:(field[curx][cury].color == 0xADFF2F?grassTexture:dirtTexture),vertexColors: THREE.VertexColors}));
+		field[curx][cury].box.position.x = curx*boxSize - 200;
+		field[curx][cury].box.position.y = 10;
+		field[curx][cury].box.scale.y = field[curx][cury].weight;
+		field[curx][cury].box.position.z = cury*boxSize - 400;
+		scene.add(field[curx][cury].box);
+		if(antDir == 0){
+			if(curx < fieldSize){
+				curx++;
+			}else{
+				iter = maxiter+1;
+			}
+		}else if(antDir == 90){
+			if(cury > 1){
+				cury--;
+			}else{
+				iter = maxiter+1;
+			}
+		}else if(antDir == 180){
+			if(curx > 1){
+				curx--;
+			}else{
+				iter = maxiter+1;
+			}
+		}else if(antDir == 270){
+			if(cury < fieldSize){
+				cury++;
+			}else{
+				iter = maxiter+1;
+			}
+		}
+	}
+	function coreInit(){
+		container = document.createElement( 'div' );
+		document.body.appendChild( container );
+		camera = new THREE.PerspectiveCamera( 80, window.innerWidth / window.innerHeight, 70, - fieldSize * boxSize * 2, fieldSize * boxSize * 4);
+		camera.position.x = 200;
+		camera.position.y = 400;
+		camera.position.z = 400;
+		clock = new THREE.Clock();
+				controls = new THREE.FirstPersonControls( camera );
+
+				controls.movementSpeed = 100;
+				controls.lookSpeed = 0.125;
+				controls.lookVertical = true;
+				controls.constrainVertical = true;
+				controls.verticalMin = 1.1;
+				controls.verticalMax = 2.2;
+
+		scene = new THREE.Scene();
+		scene.fog = new THREE.FogExp2( 0xffffff, 0.00015 );
+
+	}
+	function render() {
+		controls.update(clock.getDelta());
+		renderer.render( scene, camera );
+	}
+	function addGrid(){
+		var grid = new THREE.Geometry();
+		for(var i = -fieldSize; i <= fieldSize; i++){
+			grid.vertices.push( new THREE.Vector3( - fieldSize*boxSize, 0, i*boxSize ) );
+			grid.vertices.push( new THREE.Vector3(   fieldSize*boxSize, 0, i*boxSize ) );
+			grid.vertices.push( new THREE.Vector3( i*boxSize, 0, - fieldSize*boxSize ) );
+			grid.vertices.push( new THREE.Vector3( i*boxSize, 0,   fieldSize*boxSize ) );
+		}
+		var gridMat = new THREE.LineBasicMaterial({color:0x3f3f3f, opacity:0.1});
+		var gridLines = new THREE.LineSegments(grid,gridMat);
+		gridLines.type = THREE.LinePieces;
+		scene.add(gridLines);
+	}
+	function addLights(){
+		var directionalLight = new THREE.DirectionalLight( 0xffffff );
+		directionalLight.position.x = 1;
+		directionalLight.position.y = 1;
+		directionalLight.position.z = 1;
+		directionalLight.position.normalize();
+		scene.add( directionalLight )
+	}
+	function addStats(){
+		stats = new Stats();
+		stats.domElement.style.position = 'absolute';
+		stats.domElement.style.top = '0px';
+		container.appendChild( stats.domElement );
+	}
+	function addRenderer(){
+		renderer = new THREE.WebGLRenderer();
+		renderer.setClearColor( 0x111111 );
+		renderer.setPixelRatio( window.devicePixelRatio );
+		renderer.setSize( window.innerWidth, window.innerHeight );
+		renderer.sortObjects = false;
+		container.appendChild(renderer.domElement);
+	}
+	function addFarm(){
+		var pigTexture = loader.load( 'a0-mob-pigpink.png' );
+		pigTexture.magFilter = THREE.NearestFilter;
+		pigTexture.minFilter = THREE.LinearMipMapLinearFilter;
+		var beeTexture = loader.load( 'a0-mob-firebee.png' );
+		beeTexture.magFilter = THREE.NearestFilter;
+		beeTexture.minFilter = THREE.LinearMipMapLinearFilter;
+		var pig = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({map:pigTexture,vertexColors: THREE.VertexColors}));
+		pig.position.x = 80*boxSize - 200;
+		pig.position.y = 30;
+		pig.position.z = 80*boxSize - 400;
+		scene.add(pig);
+		var bee = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({map:beeTexture,vertexColors: THREE.VertexColors}));
+		bee.position.x = 81*boxSize - 200;
+		bee.position.y = 30;
+		bee.position.z = 80*boxSize - 400;
+		scene.add(bee);
+	}
+	function init() {
+		coreInit();
+		addGrid();
+		addLights();
+		addFarm();
+		addRenderer();
+		addStats();
+		window.addEventListener( 'resize', onWindowResize, false );
+	}
+	function onWindowResize() {
+		camera.left = window.innerWidth / - 2;
+		camera.right = window.innerWidth / 2;
+		camera.top = window.innerHeight / 2;
+		camera.bottom = window.innerHeight / - 2;
+		camera.updateProjectionMatrix();
+		controls.handleResize();
+		renderer.setSize( window.innerWidth, window.innerHeight );
+	}
+	function animate() {
+		requestAnimationFrame( animate );
+		var curepoch = (new Date).getTime();
+		if(curepoch - epoch > 20){
+			epoch = curepoch;
+			addBox();
+		}
+		render();
+		stats.update();
+	}
+    </script>
+</body>
